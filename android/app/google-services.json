@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "348643580471",
+    "project_id": "residence-patrol",
+    "storage_bucket": "residence-patrol.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348643580471:android:88cb14f13d7a06103a3db2",
+        "android_client_info": {
+          "package_name": "com.example.patrol_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb7ZETyAxltZc9fByAZmTlxUzSB6oIJ7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348643580471:android:e843c5e131bea1ab3a3db2",
+        "android_client_info": {
+          "package_name": "com.example.qr_patrol"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb7ZETyAxltZc9fByAZmTlxUzSB6oIJ7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

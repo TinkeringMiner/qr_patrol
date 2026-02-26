@@ -1,0 +1,26 @@
+name: qr_patrol
+description: QR Patrol App MVP
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  firebase_core: ^2.0.0
+  cloud_firestore: ^4.0.0
+  mobile_scanner: ^3.5.2
+  geolocator: ^10.1.0
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  
