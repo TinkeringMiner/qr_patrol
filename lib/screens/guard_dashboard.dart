@@ -1,75 +1,87 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'scan_screen.dart';
 
 class GuardDashboard extends StatefulWidget {
-  const GuardDashboard({super.key});
+  final String guardId;
+  final String guardName;
+  final String coyNumber;
+
+  const GuardDashboard({
+    Key? key,
+    required this.guardId,
+    required this.guardName,
+    required this.coyNumber,
+  }) : super(key: key);
 
   @override
   State<GuardDashboard> createState() => _GuardDashboardState();
 }
 
 class _GuardDashboardState extends State<GuardDashboard> {
-  String _guardName = 'Loading...';
-  String _coyNumber = '';
+  Map<String, dynamic>? latestScan;
+  int validScansToday = 0;
+  int invalidScansToday = 0;
+
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    _protectRoute(); // ✅ Route protection
-    _loadSession();
+    _loadPatrolStats();
   }
 
-  // 🔐 Route protection
-  Future<void> _protectRoute() async {
-    final prefs = await SharedPreferences.getInstance();
-    final role = prefs.getString('role');
+  Future<void> _loadPatrolStats() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
 
-    if (role != 'guard') {
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/login'); // redirect if not guard
+    // Fetch latest scan
+    final latestDoc = await firestore
+        .collection('patrol_logs')
+        .where('guardId', isEqualTo: widget.guardId)
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+
+    // Fetch scans today
+    final todayDocs = await firestore
+        .collection('patrol_logs')
+        .where('guardId', isEqualTo: widget.guardId)
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .get();
+
+    int valid = 0;
+    int invalid = 0;
+    for (var doc in todayDocs.docs) {
+      final status = doc['status'] ?? 'invalid';
+      if (status == 'valid') {
+        valid++;
+      } else {
+        invalid++;
+      }
     }
-  }
-
-  Future<void> _loadSession() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final name = prefs.getString('name');
-    final coy = prefs.getString('coyNumber');
 
     setState(() {
-      _guardName = name ?? 'Unknown Guard';
-      _coyNumber = coy ?? '';
+      latestScan = latestDoc.docs.isNotEmpty ? latestDoc.docs.first.data() : null;
+      validScansToday = valid;
+      invalidScansToday = invalid;
     });
   }
 
-  Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Log Out'),
-          ),
-        ],
+  Future<void> _startScan() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScanScreen(
+          guardId: widget.guardId,
+          guardName: widget.guardName,
+          coyNumber: widget.coyNumber,
+        ),
       ),
     );
 
-    if (confirm == true) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/');
+    if (result == true) {
+      _loadPatrolStats();
     }
   }
 
@@ -77,80 +89,46 @@ class _GuardDashboardState extends State<GuardDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Guard Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
-        ],
+        title: Text('Guard Dashboard - ${widget.guardName}'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: _loadPatrolStats, // pull-to-refresh
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
           children: [
-            Text(
-              'Welcome, $_guardName',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text("Scan Checkpoint"),
+              onPressed: _startScan,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Coy: $_coyNumber',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 20),
-
-            // Patrol Stats Card
+            const SizedBox(height: 24),
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Patrol Stats',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    Text('Scans Today: 0'),
-                    Text('Last Scan: N/A'),
-                  ],
-                ),
+              color: (latestScan?['status'] ?? 'valid') == 'invalid'
+                  ? Colors.red[100]
+                  : null, // visual indicator if last scan invalid
+              child: ListTile(
+                title: const Text("Latest Scan"),
+                subtitle: latestScan != null
+                    ? Text(
+                        "${latestScan!['description']} at checkpoint ${latestScan!['checkpointId']}\n"
+                        "Location: ${latestScan!['location']['latitude'].toStringAsFixed(5)}, ${latestScan!['location']['longitude'].toStringAsFixed(5)}\n"
+                        "Time: ${latestScan!['timestamp']?.toDate() ?? 'Unknown'}",
+                      )
+                    : const Text("No scans yet"),
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // Scan Button
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // QR Scan will be implemented next
-                },
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan QR Code'),
-              ),
-            ),
-
-            const Spacer(),
-
-            // 🔴 LOG OUT BUTTON
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _logout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+            const SizedBox(height: 16),
+            Card(
+              child: ListTile(
+                title: const Text("Scans Today"),
+                subtitle: Text(
+                  "Valid: $validScansToday\nInvalid: $invalidScansToday",
+                  style: TextStyle(
+                    color: invalidScansToday > 0 ? Colors.red : null,
+                    fontWeight:
+                        invalidScansToday > 0 ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
-                icon: const Icon(Icons.logout),
-                label: const Text('Log Out'),
               ),
             ),
           ],

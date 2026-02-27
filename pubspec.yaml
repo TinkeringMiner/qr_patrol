@@ -11,10 +11,19 @@ dependencies:
   flutter:
     sdk: flutter
 
-  firebase_core: ^2.20.0       # latest stable 2.x
-  cloud_firestore: ^4.9.0      # aligns with Firestore API
-  mobile_scanner: ^3.5.7       # latest compatible with your setup
+  # Firebase
+  firebase_core: ^2.20.0
+  cloud_firestore: ^4.17.5   # compatible with Flutter 3.x
+
+  google_maps_flutter: ^2.3.0 # compatible with Flutter 3.x
+
+  # QR code scanning
+  qr_code_scanner: ^1.0.1
+
+  # Geolocation (compatible with Flutter 3.x)
   geolocator: ^10.1.0
+
+  # Utilities
   intl: ^0.18.1
   shared_preferences: ^2.2.2
 
@@ -25,4 +34,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  

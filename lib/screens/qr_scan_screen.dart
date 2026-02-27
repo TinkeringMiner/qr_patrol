@@ -3,12 +3,12 @@ import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 
-class ScanScreen extends StatefulWidget {
+class QRScanScreen extends StatefulWidget {
   final String guardId;
   final String guardName;
   final String coyNumber;
 
-  const ScanScreen({
+  const QRScanScreen({
     Key? key,
     required this.guardId,
     required this.guardName,
@@ -16,13 +16,15 @@ class ScanScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ScanScreen> createState() => _ScanScreenState();
+  State<QRScanScreen> createState() => _QRScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+class _QRScanScreenState extends State<QRScanScreen> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? controller;
-  bool _isProcessing = false;
+  bool scanned = false;
+
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
   @override
   void dispose() {
@@ -30,30 +32,29 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
-  Future<void> _handleScan(String checkpointId) async {
-    if (_isProcessing) return;
-    _isProcessing = true;
+  Future<void> _handleScan(String code) async {
+    if (scanned) return;
+    scanned = true;
 
     try {
-      final firestore = FirebaseFirestore.instance;
-
-      // Validate checkpoint
-      final checkpointDoc =
-          await firestore.collection('checkpoints').doc(checkpointId).get();
-      final isValid = checkpointDoc.exists;
-      final description = isValid ? "Valid scan" : "Invalid QR code";
-
-      // Get geolocation (no permission request)
-      final position = await Geolocator.getCurrentPosition(
+      // 1️⃣ Capture geolocation (no permission prompts)
+      Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Save patrol log
+      // 2️⃣ Validate checkpoint
+      DocumentSnapshot checkpointDoc =
+          await firestore.collection('checkpoints').doc(code).get();
+
+      bool isValid = checkpointDoc.exists;
+      String description = isValid ? "Valid scan" : "Invalid QR code";
+
+      // 3️⃣ Save scan to patrol_logs
       await firestore.collection('patrol_logs').add({
         "guardId": widget.guardId,
         "guardName": widget.guardName,
         "coyNumber": widget.coyNumber,
-        "checkpointId": checkpointId,
+        "checkpointId": code,
         "timestamp": FieldValue.serverTimestamp(),
         "location": {
           "latitude": position.latitude,
@@ -63,6 +64,7 @@ class _ScanScreenState extends State<ScanScreen> {
         "description": description,
       });
 
+      // 4️⃣ Show confirmation
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,24 +74,27 @@ class _ScanScreenState extends State<ScanScreen> {
         );
       }
 
-      // Return to previous screen after short delay
+      // 5️⃣ Return to dashboard after short delay
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) Navigator.pop(context, true); // triggers stats update
+        if (mounted) Navigator.pop(context, true);
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(
+            content: Text("Error scanning: $e"),
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
-      _isProcessing = false;
+      scanned = false; // allow retry
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan Checkpoint")),
+      appBar: AppBar(title: const Text("Scan QR Checkpoint")),
       body: QRView(
         key: qrKey,
         onQRViewCreated: (controller) {
