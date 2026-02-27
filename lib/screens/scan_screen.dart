@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ScanScreen extends StatefulWidget {
   final String guardId;
@@ -9,102 +7,74 @@ class ScanScreen extends StatefulWidget {
   final String coyNumber;
 
   const ScanScreen({
-    Key? key,
+    super.key,
     required this.guardId,
     required this.guardName,
     required this.coyNumber,
-  }) : super(key: key);
+  });
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+  );
+
   bool _isProcessing = false;
 
   @override
   void dispose() {
-    controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _handleScan(String checkpointId) async {
+  Future<void> _handleScannedCode(String code) async {
     if (_isProcessing) return;
+
     _isProcessing = true;
 
     try {
-      final firestore = FirebaseFirestore.instance;
+      // 🔥 Call your existing Firestore validation logic here
+      print("Scanned QR: $code");
+      print("Guard ID: ${widget.guardId}");
+      print("Guard Name: ${widget.guardName}");
+      print("Coy Number: ${widget.coyNumber}");
 
-      // Validate checkpoint
-      final checkpointDoc =
-          await firestore.collection('checkpoints').doc(checkpointId).get();
-      final isValid = checkpointDoc.exists;
-      final description = isValid ? "Valid scan" : "Invalid QR code";
-
-      // Get geolocation (no permission request)
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Scanned: $code")),
       );
-
-      // Save patrol log
-      await firestore.collection('patrol_logs').add({
-        "guardId": widget.guardId,
-        "guardName": widget.guardName,
-        "coyNumber": widget.coyNumber,
-        "checkpointId": checkpointId,
-        "timestamp": FieldValue.serverTimestamp(),
-        "location": {
-          "latitude": position.latitude,
-          "longitude": position.longitude,
-        },
-        "status": isValid ? "valid" : "invalid",
-        "description": description,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(description),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // Return to previous screen after short delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) Navigator.pop(context, true); // triggers stats update
-      });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
-      }
-      _isProcessing = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error processing QR")),
+      );
     }
+
+    await Future.delayed(const Duration(seconds: 2));
+    _isProcessing = false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan Checkpoint")),
-      body: QRView(
-        key: qrKey,
-        onQRViewCreated: (controller) {
-          this.controller = controller;
-          controller.scannedDataStream.listen((scanData) {
-            if (scanData.code != null) _handleScan(scanData.code!);
-          });
+      appBar: AppBar(
+        title: const Text("Scan Checkpoint"),
+      ),
+      body: MobileScanner(
+        controller: _controller,
+        onDetect: (capture) {
+          final List<Barcode> barcodes = capture.barcodes;
+
+          for (final barcode in barcodes) {
+            final String? code = barcode.rawValue;
+
+            if (code != null) {
+              _handleScannedCode(code);
+              break; // prevent multiple triggers
+            }
+          }
         },
-        overlay: QrScannerOverlayShape(
-          borderColor: Colors.blue,
-          borderRadius: 10,
-          borderLength: 30,
-          borderWidth: 10,
-          cutOutSize: 250,
-        ),
       ),
     );
   }

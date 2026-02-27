@@ -8,11 +8,11 @@ class GuardDashboard extends StatefulWidget {
   final String coyNumber;
 
   const GuardDashboard({
-    Key? key,
+    super.key,
     required this.guardId,
     required this.guardName,
     required this.coyNumber,
-  }) : super(key: key);
+  });
 
   @override
   State<GuardDashboard> createState() => _GuardDashboardState();
@@ -35,7 +35,7 @@ class _GuardDashboardState extends State<GuardDashboard> {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
-    // Fetch latest scan
+    // Latest scan
     final latestDoc = await firestore
         .collection('patrol_logs')
         .where('guardId', isEqualTo: widget.guardId)
@@ -43,17 +43,21 @@ class _GuardDashboardState extends State<GuardDashboard> {
         .limit(1)
         .get();
 
-    // Fetch scans today
+    // Today's scans
     final todayDocs = await firestore
         .collection('patrol_logs')
         .where('guardId', isEqualTo: widget.guardId)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where(
+          'timestamp',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+        )
         .get();
 
     int valid = 0;
     int invalid = 0;
+
     for (var doc in todayDocs.docs) {
-      final status = doc['status'] ?? 'invalid';
+      final status = doc.data()['status'] ?? 'invalid';
       if (status == 'valid') {
         valid++;
       } else {
@@ -62,7 +66,8 @@ class _GuardDashboardState extends State<GuardDashboard> {
     }
 
     setState(() {
-      latestScan = latestDoc.docs.isNotEmpty ? latestDoc.docs.first.data() : null;
+      latestScan =
+          latestDoc.docs.isNotEmpty ? latestDoc.docs.first.data() : null;
       validScansToday = valid;
       invalidScansToday = invalid;
     });
@@ -81,18 +86,35 @@ class _GuardDashboardState extends State<GuardDashboard> {
     );
 
     if (result == true) {
-      _loadPatrolStats();
+      await _loadPatrolStats();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final status = latestScan?['status'] ?? 'valid';
+    final location = latestScan?['location'];
+    final timestamp = latestScan?['timestamp'];
+
+    String locationText = "Unknown location";
+    if (location != null &&
+        location['latitude'] != null &&
+        location['longitude'] != null) {
+      locationText =
+          "${location['latitude'].toStringAsFixed(5)}, ${location['longitude'].toStringAsFixed(5)}";
+    }
+
+    String timeText = "Unknown time";
+    if (timestamp != null && timestamp is Timestamp) {
+      timeText = timestamp.toDate().toString();
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Guard Dashboard - ${widget.guardName}'),
       ),
       body: RefreshIndicator(
-        onRefresh: _loadPatrolStats, // pull-to-refresh
+        onRefresh: _loadPatrolStats,
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
@@ -102,22 +124,26 @@ class _GuardDashboardState extends State<GuardDashboard> {
               onPressed: _startScan,
             ),
             const SizedBox(height: 24),
+
+            // Latest Scan Card
             Card(
-              color: (latestScan?['status'] ?? 'valid') == 'invalid'
-                  ? Colors.red[100]
-                  : null, // visual indicator if last scan invalid
+              color: status == 'invalid' ? Colors.red[100] : null,
               child: ListTile(
                 title: const Text("Latest Scan"),
                 subtitle: latestScan != null
                     ? Text(
-                        "${latestScan!['description']} at checkpoint ${latestScan!['checkpointId']}\n"
-                        "Location: ${latestScan!['location']['latitude'].toStringAsFixed(5)}, ${latestScan!['location']['longitude'].toStringAsFixed(5)}\n"
-                        "Time: ${latestScan!['timestamp']?.toDate() ?? 'Unknown'}",
+                        "${latestScan!['description'] ?? 'No description'}\n"
+                        "Checkpoint: ${latestScan!['checkpointId'] ?? 'Unknown'}\n"
+                        "Location: $locationText\n"
+                        "Time: $timeText",
                       )
                     : const Text("No scans yet"),
               ),
             ),
+
             const SizedBox(height: 16),
+
+            // Stats Card
             Card(
               child: ListTile(
                 title: const Text("Scans Today"),
@@ -125,8 +151,9 @@ class _GuardDashboardState extends State<GuardDashboard> {
                   "Valid: $validScansToday\nInvalid: $invalidScansToday",
                   style: TextStyle(
                     color: invalidScansToday > 0 ? Colors.red : null,
-                    fontWeight:
-                        invalidScansToday > 0 ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: invalidScansToday > 0
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ),

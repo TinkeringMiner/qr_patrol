@@ -18,7 +18,8 @@ dependencies:
   google_maps_flutter: ^2.3.0 # compatible with Flutter 3.x
 
   # QR code scanning
-  qr_code_scanner: ^1.0.1
+  # qr_code_scanner: ^1.0.1  # not comaptible with web, so we will use mobile_scanner: ^3.5.6  for web support
+  mobile_scanner: ^3.5.6   # compatible with Flutter 3.x and supports web
 
   # Geolocation (compatible with Flutter 3.x)
   geolocator: ^10.1.0
