@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
+// Screens
+import 'screens/login_screen.dart';
+import 'screens/guard_dashboard.dart';
+import 'screens/admin_dashboard.dart';
+import 'screens/splash_screen.dart';
+import 'screens/supervisor_dashboard.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -17,13 +24,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Text('Firebase Initialized Successfully'),
-        ),
-      ),
+
+      // Routes
+      routes: {
+        '/': (context) => const SplashScreen(),
+  '/login': (context) => const LoginScreen(),
+  '/guardDashboard': (context) => const GuardDashboard(),
+  '/adminDashboard': (context) => const AdminDashboard(),
+  '/supervisorDashboard': (context) => const SupervisorDashboard(), 
+      },
+
+      initialRoute: '/',
     );
   }
 }

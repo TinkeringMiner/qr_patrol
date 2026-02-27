@@ -11,15 +11,17 @@ dependencies:
   flutter:
     sdk: flutter
 
-  firebase_core: ^2.0.0
-  cloud_firestore: ^4.0.0
-  mobile_scanner: ^3.5.2
+  firebase_core: ^2.20.0       # latest stable 2.x
+  cloud_firestore: ^4.9.0      # aligns with Firestore API
+  mobile_scanner: ^3.5.7       # latest compatible with your setup
   geolocator: ^10.1.0
   intl: ^0.18.1
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^2.0.1
 
 flutter:
   uses-material-design: true
